@@ -18,6 +18,7 @@ worker() {
 
   export WORKERS_COUNT=${WORKERS_COUNT:-2}
   export QUEUES=${QUEUES:-}
+  export JAVA_HOME=/usr/lib/jvm/default-java
 
   exec supervisord -c worker.conf
 }
@@ -32,6 +33,7 @@ server() {
   # Recycle gunicorn workers every n-th request. See http://docs.gunicorn.org/en/stable/settings.html#max-requests for more details.
   MAX_REQUESTS=${MAX_REQUESTS:-1000}
   MAX_REQUESTS_JITTER=${MAX_REQUESTS_JITTER:-100}
+  export JAVA_HOME=/usr/lib/jvm/default-java
   exec /usr/local/bin/gunicorn -b 0.0.0.0:5000 --name redash -w${REDASH_WEB_WORKERS:-4} redash.wsgi:app --max-requests $MAX_REQUESTS --max-requests-jitter $MAX_REQUESTS_JITTER
 }
 

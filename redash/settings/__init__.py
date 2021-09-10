@@ -382,6 +382,7 @@ default_query_runners = [
     "redash.query_runner.corporate_memory",
     "redash.query_runner.sparql_endpoint",
     "redash.query_runner.excel",
+    "redash.query_runner.sybase",
     "redash.query_runner.csv"
 ]
 
