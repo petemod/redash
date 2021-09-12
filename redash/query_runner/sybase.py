@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import jaydebeapi
+    from jaydebeapi import DatabaseError
 
     enabled = True
 except ImportError:
@@ -50,7 +51,7 @@ class SybaseServer(BaseSQLQueryRunner):
                     "title": "Character Set",
                 },
                 "db": {"type": "string", "title": "Database Name"},
-				"extra_params": {"type": "string", "title": "Extra connection paramaters", "default": "?charset=utf8"},
+                "extra_params": {"type": "string", "title": "Extra connection paramaters", "default": "?charset=utf8"},
                 "startup_command": {"type": "string", "title": "Startup Command"},
             },
             "required": ["db"],
@@ -72,13 +73,12 @@ class SybaseServer(BaseSQLQueryRunner):
     def _get_tables(self, schema):
         query = """SELECT
 NULL TABLE_SCHEMA,
-so.name table_name,
-sc.name column_name
-
+so.name name,
+sc.name name1
 FROM 
-sysobjects so
+.dbo.sysobjects so
 INNER JOIN 
-syscolumns sc
+.dbo.syscolumns sc
 ON sc.id = so.id
 inner join systypes st on st.usertype = sc.usertype 
 where so.type <> 'S'
@@ -113,23 +113,25 @@ where so.type <> 'S'
             driver = self.configuration.get("driver", "jdbc:sybase:Tds")
             charset = self.configuration.get("charset", "UTF-8")
             params = self.configuration.get("extra_params", "?charset=utf8")
-            
+
             startup = self.configuration.get("startup_command", "")
-            
+
             conn_str = "%s:%s:%s/%s%s" % (driver, server, port, db, params)
-            
+
             logger.warning("Sybase conn_str: %s" % conn_str)
-            
+
             connection = jaydebeapi.connect('com.sybase.jdbc3.jdbc.SybDriver', conn_str, [user, password],
-                                  '/app/java/jconn3.jar')
+                                            '/app/java/jconn3.jar')
 
             if isinstance(query, str):
                 query = query.encode(charset)
-            
+
             if len(startup) > 0:
-            	curs = connection.cursor()
-            	curs.execute(startup)
-            	curs.close()
+                sqls = startup.split(';')
+                for sql in sqls:
+                    curs = connection.cursor()
+                    curs.execute(sql)
+                    curs.close()
 
             cursor = connection.cursor()
             logger.debug("Sybase running query: %s", query)
@@ -154,22 +156,20 @@ where so.type <> 'S'
                 json_data = None
 
             cursor.close()
-        except Exception as e:
+        except DatabaseError as e:
             logger.error(e)
-            try:
-                # Query errors are at `args[1]`
-                error = e.args[1]
-            except IndexError:
-                # Connection errors are `args[0][1]`
-                error = e.args[0][1]
+            error = e.args[0].args[0]
             json_data = None
         except (KeyboardInterrupt, JobTimeoutException):
             connection.cancel()
             raise
+        except Exception as e:
+            logger.error(e)
+            error = e.args[0]
+            json_data = None
         finally:
             if connection:
                 connection.close()
-
         return json_data, error
 
 
